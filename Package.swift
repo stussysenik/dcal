@@ -28,7 +28,8 @@ let package = Package(
         .target(
             name: "Infrastructure",
             dependencies: ["Domain", "Application"],
-            path: "Sources/Infrastructure"
+            path: "Sources/Infrastructure",
+            linkerSettings: [.linkedLibrary("sqlite3")]
         ),
 
         // ── CLI (Swift ArgumentParser) ──
@@ -48,6 +49,11 @@ let package = Package(
             name: "DomainTests",
             dependencies: ["Domain", "Application"],
             path: "Tests/DomainTests"
+        ),
+        .testTarget(
+            name: "InfrastructureTests",
+            dependencies: ["Infrastructure", "Application", "Domain"],
+            path: "Tests/InfrastructureTests"
         ),
     ]
 )
