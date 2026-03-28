@@ -46,7 +46,7 @@ let package = Package(
         // ── Tests ──
         .testTarget(
             name: "DomainTests",
-            dependencies: ["Domain"],
+            dependencies: ["Domain", "Application"],
             path: "Tests/DomainTests"
         ),
     ]
