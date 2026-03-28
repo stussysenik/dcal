@@ -32,6 +32,13 @@ let package = Package(
             linkerSettings: [.linkedLibrary("sqlite3")]
         ),
 
+        // ── GUI (SwiftUI menu bar app) ──
+        .executableTarget(
+            name: "dcal-app",
+            dependencies: ["Domain", "Application", "Infrastructure"],
+            path: "Sources/App"
+        ),
+
         // ── CLI (Swift ArgumentParser) ──
         .executableTarget(
             name: "dcal",
