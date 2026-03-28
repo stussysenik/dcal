@@ -18,6 +18,10 @@ struct DCal: ParsableCommand {
             Analyze.self,
             Preset.self,
             Profile.self,
+            History.self,
+            Drift.self,
+            Twin.self,
+            Query.self,
         ],
         defaultSubcommand: Status.self
     )
