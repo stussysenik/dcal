@@ -19,6 +19,26 @@ struct Status: ParsableCommand {
         let detector = DisplayDetector()
         let displays = try syncBridge { try await detector.connectedDisplays() }
 
+        // Silent capture: record display state on every status invocation.
+        if let capture = DataLayer.captureService() {
+            capture.captureDisplays(displays)
+            let gamma = GammaAdapter()
+            for display in displays {
+                if let ramp = gamma.readGamma(displayID: display.id) {
+                    let analysis = gamma.analyzeGamma(ramp)
+                    let did = displayID(vendorID: display.vendorID, modelID: display.modelID, serialNumber: display.serialNumber)
+                    let bandingRisk = BitDepthOptimizer.bandingRisk(ramp: ramp.red, gamma: analysis.averageGamma)
+                    capture.captureMeasurement(
+                        displayID: did, trigger: "status",
+                        gammaR: analysis.redGamma, gammaG: analysis.greenGamma,
+                        gammaB: analysis.blueGamma, gammaAvg: analysis.averageGamma,
+                        channelDeviation: analysis.channelDeviation,
+                        bandingRisk: bandingRisk
+                    )
+                }
+            }
+        }
+
         if displays.isEmpty {
             print("  No displays detected.")
             return

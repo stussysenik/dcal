@@ -40,6 +40,20 @@ struct Analyze: ParsableCommand {
 
         let analysis = gammaAdapter.analyzeGamma(ramp)
 
+        // Silent capture: record display + measurement on every analyze invocation.
+        if let capture = DataLayer.captureService() {
+            capture.captureDisplays(displays)
+            let did = Application.displayID(vendorID: display.vendorID, modelID: display.modelID, serialNumber: display.serialNumber)
+            let banding = BitDepthOptimizer.bandingRisk(ramp: ramp.red, gamma: analysis.averageGamma)
+            capture.captureMeasurement(
+                displayID: did, trigger: "analyze",
+                gammaR: analysis.redGamma, gammaG: analysis.greenGamma,
+                gammaB: analysis.blueGamma, gammaAvg: analysis.averageGamma,
+                channelDeviation: analysis.channelDeviation,
+                bandingRisk: banding
+            )
+        }
+
         if export {
             try runExport(display: display, ramp: ramp, analysis: analysis)
             return

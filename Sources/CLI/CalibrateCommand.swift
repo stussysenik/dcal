@@ -1,6 +1,7 @@
 import ArgumentParser
 import Foundation
 import Domain
+import Application
 import Infrastructure
 
 struct Calibrate: ParsableCommand {
@@ -64,6 +65,21 @@ struct Calibrate: ParsableCommand {
         print("     Channel match:  ±\(f3(analysis.channelDeviation))")
         print("     Samples:        \(analysis.sampleCount) entries")
         print("     Native gamma:   \(f2(targetDisplay.estimatedNativeGamma)) (estimated)")
+
+        // Silent capture: record display + pre-calibration measurement.
+        let capture = DataLayer.captureService()
+        let stableID = Application.displayID(vendorID: targetDisplay.vendorID, modelID: targetDisplay.modelID, serialNumber: targetDisplay.serialNumber)
+        if let capture {
+            capture.captureDisplays(displays)
+            let preBanding = BitDepthOptimizer.bandingRisk(ramp: currentRamp.red, gamma: analysis.averageGamma)
+            capture.captureMeasurement(
+                displayID: stableID, trigger: "calibrate_pre",
+                gammaR: analysis.redGamma, gammaG: analysis.greenGamma,
+                gammaB: analysis.blueGamma, gammaAvg: analysis.averageGamma,
+                channelDeviation: analysis.channelDeviation,
+                bandingRisk: preBanding
+            )
+        }
 
         // Step 2: Analyze display
         print("")
@@ -208,6 +224,30 @@ struct Calibrate: ParsableCommand {
                 let channelOK = verifyAnalysis.channelDeviation < 0.05
                 print("  \(channelOK ? "✓" : "⚠") Channel balance  ±\(f3(verifyAnalysis.channelDeviation))  \(channelOK ? "PASS" : "CHECK")")
                 print("  ✓ Profile         \(targetName)")
+
+                // Silent capture: post-measurement + calibration record.
+                if let capture {
+                    let postBanding = BitDepthOptimizer.bandingRisk(ramp: verifyRamp.red, gamma: verifyAnalysis.averageGamma)
+                    capture.captureMeasurement(
+                        displayID: stableID, trigger: "calibrate_post",
+                        gammaR: verifyAnalysis.redGamma, gammaG: verifyAnalysis.greenGamma,
+                        gammaB: verifyAnalysis.blueGamma, gammaAvg: verifyAnalysis.averageGamma,
+                        channelDeviation: verifyAnalysis.channelDeviation,
+                        bandingRisk: postBanding
+                    )
+                    let calRecord = CalibrationRecord(
+                        id: UUID().uuidString,
+                        displayID: stableID,
+                        timestamp: Date(),
+                        targetGamma: targetGamma,
+                        measuredGammaBefore: analysis.averageGamma,
+                        measuredGammaAfter: estimatedEndToEnd,
+                        success: gammaError < 0.05,
+                        method: formula ? "formula" : "lut",
+                        durationSeconds: 0
+                    )
+                    capture.captureCalibration(calRecord)
+                }
             }
         } else {
             print("     ✗ Failed to apply gamma ramp.")
