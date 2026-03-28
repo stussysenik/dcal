@@ -14,15 +14,11 @@
 
 import SwiftUI
 import Application
+import Infrastructure
 
 struct DCalPopover: View {
     @Environment(DisplayStateModel.self) private var state
 
-    // Local slider state — not wired to hardware yet (future task)
-    @State private var brightness: Double = 50
-    @State private var contrast: Double = 50
-    @State private var whitePoint: Double = 6500
-    @State private var selectedPreset: CalibrationPreset = .rec709
 
     var body: some View {
         VStack(spacing: 0) {
@@ -47,7 +43,10 @@ struct DCalPopover: View {
                     adjustmentSection
 
                     // MARK: - Preset Picker
-                    PresetPicker(selection: $selectedPreset)
+                    PresetPicker(selection: Bindable(state).selectedPreset)
+                        .onChange(of: state.selectedPreset) { _, newPreset in
+                            state.applyPreset(newPreset)
+                        }
 
                     // MARK: - Calibrate Button
                     calibrateButton
@@ -139,11 +138,11 @@ struct DCalPopover: View {
                 .font(.dcSectionHeader)
                 .foregroundStyle(Color.dcTextTertiary)
 
-            SliderControl(label: "Brightness", value: $brightness)
-            SliderControl(label: "Contrast", value: $contrast)
+            SliderControl(label: "Brightness", value: Bindable(state).brightness)
+            SliderControl(label: "Contrast", value: Bindable(state).contrast)
             SliderControl(
                 label: "White Point (K)",
-                value: $whitePoint,
+                value: Bindable(state).whitePointKelvin,
                 range: 4000...10000,
                 format: "%.0f"
             )
@@ -151,6 +150,9 @@ struct DCalPopover: View {
         .padding(DCLayout.contentPadding)
         .background(Color.dcSurface2)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .onChange(of: state.brightness) { state.sliderChanged() }
+        .onChange(of: state.contrast) { state.sliderChanged() }
+        .onChange(of: state.whitePointKelvin) { state.sliderChanged() }
     }
 
     // MARK: - Calibrate Button
@@ -199,6 +201,7 @@ struct DCalPopover: View {
             Spacer()
 
             Button("Quit") {
+                GammaAdapter().restoreDefaults()
                 NSApplication.shared.terminate(nil)
             }
             .buttonStyle(.plain)
