@@ -17,7 +17,7 @@ struct Status: ParsableCommand {
         print("════════════════════════════════════════════════════════════")
 
         let detector = DisplayDetector()
-        let displays = try syncRun { try await detector.connectedDisplays() }
+        let displays = try syncBridge { try await detector.connectedDisplays() }
 
         if displays.isEmpty {
             print("  No displays detected.")
@@ -75,33 +75,5 @@ struct Status: ParsableCommand {
         } else {
             print("  No controllable displays found.")
         }
-    }
-}
-
-/// Thread-safe box for passing results across concurrency boundaries.
-private final class ResultBox<T: Sendable>: @unchecked Sendable {
-    var value: Result<T, Error>?
-}
-
-/// Bridge async code into ArgumentParser's synchronous run().
-private func syncRun<T: Sendable>(_ block: @Sendable @escaping () async throws -> T) throws -> T {
-    let semaphore = DispatchSemaphore(value: 0)
-    let box = ResultBox<T>()
-
-    Task { @Sendable in
-        do {
-            let value = try await block()
-            box.value = .success(value)
-        } catch {
-            box.value = .failure(error)
-        }
-        semaphore.signal()
-    }
-
-    semaphore.wait()
-
-    switch box.value! {
-    case .success(let value): return value
-    case .failure(let error): throw error
     }
 }

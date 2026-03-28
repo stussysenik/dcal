@@ -24,7 +24,7 @@ struct Analyze: ParsableCommand {
     func run() throws {
         let gammaAdapter = GammaAdapter()
         let detector = DisplayDetector()
-        let displays = try syncAnalyze { try await detector.connectedDisplays() }
+        let displays = try syncBridge { try await detector.connectedDisplays() }
 
         guard let display = displays.first else {
             print("  No displays detected.")
@@ -351,26 +351,5 @@ struct Analyze: ParsableCommand {
     private func f6(_ v: Double) -> String { String(format: "%.6f", v) }
     private func signedF3(_ v: Double) -> String {
         v >= 0 ? "+\(f3(v))" : f3(v)
-    }
-}
-
-/// Thread-safe box for passing results across async/sync boundary.
-private final class AnalyzeBox<T: Sendable>: @unchecked Sendable {
-    var value: Result<T, Error>?
-}
-
-/// Bridge async code into ArgumentParser's synchronous run().
-private func syncAnalyze<T: Sendable>(_ block: @Sendable @escaping () async throws -> T) throws -> T {
-    let sem = DispatchSemaphore(value: 0)
-    let box = AnalyzeBox<T>()
-    Task { @Sendable in
-        do { box.value = .success(try await block()) }
-        catch { box.value = .failure(error) }
-        sem.signal()
-    }
-    sem.wait()
-    switch box.value! {
-    case .success(let v): return v
-    case .failure(let e): throw e
     }
 }
