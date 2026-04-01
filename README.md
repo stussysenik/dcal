@@ -2,6 +2,9 @@
 
 # dcal
 
+![Demo](demo.gif)
+
+
 **Professional display calibration for macOS.**
 
 Software gamma correction, color temperature control, and real-time display analysis — from the menu bar.
