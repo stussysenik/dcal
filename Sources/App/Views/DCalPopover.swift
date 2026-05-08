@@ -134,17 +134,36 @@ struct DCalPopover: View {
 
     private var adjustmentSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("ADJUSTMENTS")
-                .font(.dcSectionHeader)
-                .foregroundStyle(Color.dcTextTertiary)
+            HStack {
+                Text("ADJUSTMENTS")
+                    .font(.dcSectionHeader)
+                    .foregroundStyle(Color.dcTextTertiary)
+                Spacer()
+                Toggle("Color Correction", isOn: Bindable(state).correctionEnabled)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .font(.dcCaption)
+                    .onChange(of: state.correctionEnabled) { _, newValue in
+                        state.setCorrectionEnabled(newValue)
+                    }
+            }
 
-            SliderControl(label: "Brightness", value: Bindable(state).brightness)
-            SliderControl(label: "Contrast", value: Bindable(state).contrast)
+            SliderControl(
+                label: "Brightness",
+                value: Bindable(state).brightness,
+                isEnabled: state.correctionEnabled
+            )
+            SliderControl(
+                label: "Contrast",
+                value: Bindable(state).contrast,
+                isEnabled: state.correctionEnabled
+            )
             SliderControl(
                 label: "White Point (K)",
                 value: Bindable(state).whitePointKelvin,
                 range: 4000...10000,
-                format: "%.0f"
+                format: "%.0f",
+                isEnabled: state.correctionEnabled
             )
         }
         .padding(DCLayout.contentPadding)

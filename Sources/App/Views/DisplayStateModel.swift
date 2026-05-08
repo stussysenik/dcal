@@ -40,7 +40,12 @@ final class DisplayStateModel {
     var whitePointKelvin: Double = 6500
     var selectedPreset: CalibrationPreset = .rec709
 
+    // Feature flag — enables or disables the corrected gamma output.
+    // Persisted across app launches via @AppStorage.
+    var correctionEnabled: Bool = false
+
     private var applyTask: Task<Void, Never>?
+    private var hasLoadedStorage = false
 
     /// The currently selected display, if any.
     var selectedDisplay: DisplayInfo? {
@@ -65,20 +70,67 @@ final class DisplayStateModel {
                     gammaAvg = analysis.averageGamma
                     channelDeviation = analysis.channelDeviation
                 }
+
+                if !hasLoadedStorage {
+                    hasLoadedStorage = true
+                    loadStoredState()
+                }
             } catch {
                 // Display enumeration failed — leave state unchanged
             }
         }
     }
 
+    /// Load persisted correction state from UserDefaults.
+    private func loadStoredState() {
+        let defaults = UserDefaults.standard
+        correctionEnabled = defaults.bool(forKey: "dcal.correctionEnabled")
+        if correctionEnabled {
+            applyGamma()
+        }
+    }
+
+    /// Persist correction state to UserDefaults.
+    private func saveStoredState() {
+        UserDefaults.standard.set(correctionEnabled, forKey: "dcal.correctionEnabled")
+    }
+
     /// Called when any slider value changes. Debounces rapid updates
     /// to avoid hammering CoreGraphics during drag.
     func sliderChanged() {
+        guard correctionEnabled else { return }
         applyTask?.cancel()
         applyTask = Task {
             try? await Task.sleep(for: .milliseconds(50))
             guard !Task.isCancelled else { return }
             applyGamma()
+        }
+    }
+
+    /// Toggle color correction on or off.
+    func setCorrectionEnabled(_ enabled: Bool) {
+        correctionEnabled = enabled
+        saveStoredState()
+        if enabled {
+            applyGamma()
+        } else {
+            GammaAdapter().restoreDefaults()
+            // Refresh the gamma readout so it shows the native uncorrected values.
+            refreshReadout()
+        }
+    }
+
+    /// Read back the current gamma ramp without re-enumerating displays.
+    private func refreshReadout() {
+        guard let display = selectedDisplay else { return }
+        let gamma = GammaAdapter()
+        if let ramp = gamma.readGamma(displayID: display.id) {
+            let analysis = gamma.analyzeGamma(ramp)
+            gammaR = analysis.redGamma
+            gammaG = analysis.greenGamma
+            gammaB = analysis.blueGamma
+            gammaAvg = analysis.averageGamma
+            channelDeviation = analysis.channelDeviation
         }
     }
 
@@ -98,7 +150,9 @@ final class DisplayStateModel {
             contrast = 50
             whitePointKelvin = 6500
         }
-        sliderChanged()
+        if correctionEnabled {
+            sliderChanged()
+        }
     }
 
     /// Compose the current slider values into a gamma ramp and apply it.
